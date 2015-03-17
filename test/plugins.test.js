@@ -863,6 +863,49 @@ function serveStaticTest(t, testDefault, tmpDir, regex) {
     });
 }
 
+//Helper function for test GH #719
+function serveStaticTestWithAliasRouting(t, testDefault, alias) {
+    var staticContent = '{"content": "abcdefg"}';
+    var staticObj = JSON.parse(staticContent);
+    var testDir = 'public';
+    var testFileName = 'index.json';
+    var routeName = 'GET filename with alias';
+    var tmpPath = process.cwd();
+    fs.mkdir(tmpPath, function (err) {
+        DIRS_TO_DELETE.push(tmpPath);
+        var folderPath = path.join(tmpPath, testDir);
+
+        fs.mkdir(folderPath, function (err2) {
+            t.ifError(err2);
+
+            DIRS_TO_DELETE.push(folderPath);
+            var file = path.join(folderPath, testFileName);
+
+            fs.writeFile(file, staticContent, function (err3) {
+                t.ifError(err3);
+                FILES_TO_DELETE.push(file);
+                var opts = { directory: tmpPath };
+                if (testDefault) {
+                    opts.file = testFileName;
+                    routeName += ' with default';
+                }
+                var re = new RegExp('/' + testDir + '/?.*');
+
+                SERVER.get(alias, restify.serveStatic(opts));
+
+                var p = '/' + alias;
+                CLIENT.get(p, function (err4, req, res, obj) {
+                    t.ifError(err4);
+                    t.equal(res.headers['cache-control'],
+                        'public, max-age=3600');
+                    t.deepEqual(obj, staticObj);
+                    t.end();
+                });
+            });
+        });
+    });
+}
+
 test('static serves static files', function (t) {
     serveStaticTest(t, false, '.tmp');
 });
@@ -885,4 +928,8 @@ test('static serves default file', function (t) {
 
 test('GH-379 static serves file with parentheses in path', function (t) {
     serveStaticTest(t, false, '.(tmp)');
+});
+
+test('GH-719 static allow for serving static files that do not use the route as a path', function (t) {
+    serveStaticTestWithAliasRouting(t, true, 'testroute');
 });
