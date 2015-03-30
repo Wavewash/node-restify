@@ -100,6 +100,7 @@ before(function (callback) {
         });
 
         SERVER.use(restify.acceptParser(['json', 'text/plain']));
+        SERVER.use(restify.jsonp()); // Added for GH-778
         SERVER.use(restify.dateParser());
         SERVER.use(restify.authorizationParser());
         SERVER.use(restify.queryParser());
@@ -195,6 +196,20 @@ test('GET json', function (t) {
     });
 });
 
+test('GH-778 GET jsonp', function (t) {
+    // Using variables here to keep lines under 80 chars
+    var jsonpUrl = '/json/jsonp?callback=testCallback';
+    var expectedResult = 'typeof testCallback === \'function\' && ' +
+                         'testCallback({"hello":"jsonp"});';
+
+    JSON_CLIENT.get(jsonpUrl, function (err, req, res) {
+        t.ifError(err);
+        t.ok(req);
+        t.ok(res);
+        t.equal(res.body, expectedResult);
+        t.end();
+    });
+});
 
 test('GH-388 GET json, but really HTML', function (t) {
     JSON_CLIENT.get('/json/boom', function (err, req, res, obj) {
@@ -525,6 +540,19 @@ test('POST raw', function (t) {
                 t.end();
             });
         });
+    });
+});
+
+test('PR-726 Enable {agent: false} option override per request', function (t) {
+    var opts = {
+        path: '/str/noagent',
+        agent: false
+    };
+    RAW_CLIENT.get(opts, function (err, req, res) {
+        t.ifError(err);
+        t.notStrictEqual(req.agent, RAW_CLIENT.agent,
+            'request should not use client agent');
+        t.end();
     });
 });
 
